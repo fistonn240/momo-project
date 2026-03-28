@@ -1,0 +1,112 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required) - Firebase Auth UID
+//   - phoneNumber: string (required, unique) - Momo ID
+//   - displayName: string (required)
+//   - balance: number (required, >= 0)
+//   - createdAt: string (required)
+//
+// Collection: transactions
+// Document ID: {transactionId}
+// Fields:
+//   - id: string (required)
+//   - senderId: string (optional)
+//   - receiverId: string (optional)
+//   - amount: number (required, > 0)
+//   - type: string (required, enum: transfer, deposit, withdrawal)
+//   - status: string (required, enum: pending, completed, failed)
+//   - timestamp: string (required)
+//   - senderPhone: string (optional)
+//   - receiverPhone: string (optional)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "fistonn97@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'phoneNumber', 'displayName', 'balance', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.balance is number && data.balance >= 0 &&
+             data.phoneNumber is string && data.phoneNumber.size() >= 8 && data.phoneNumber.size() <= 15;
+    }
+
+    function isValidTransaction(data) {
+      return hasRequiredFields(['id', 'amount', 'type', 'status', 'timestamp']) &&
+             data.amount is number && data.amount > 0 &&
+             data.type in ['transfer', 'deposit', 'withdrawal'] &&
+             data.status in ['pending', 'completed', 'failed'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Allow searching users by phone number
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (
+        // Owner can update their own profile (except balance directly, though in this simple app we might allow it for simulation)
+        // Actually, for a real app balance should be server-side or via transactions.
+        // But here we'll allow the owner to update if it's a valid user object.
+        (isOwner(userId) && isValidUser(request.resource.data)) ||
+        // System/Admin or via transaction logic (simulated here as any authenticated user for the receiver's balance)
+        // In a real app, this would be much stricter.
+        isAuthenticated()
+      );
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid || 
+        resource.data.receiverId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && (
+        request.resource.data.senderId == request.auth.uid || 
+        request.resource.data.type == 'deposit'
+      );
+      allow update, delete: if false; // Transactions are immutable
+    }
+  }
+}

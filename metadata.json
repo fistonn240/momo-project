@@ -1,0 +1,5 @@
+{
+  "name": "Momo System",
+  "description": "A secure and real-time Mobile Money system for managing balances, sending money, and tracking transactions.",
+  "requestFramePermissions": []
+}

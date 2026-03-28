@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores user balance, phone number, and basic info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID from Firebase Auth." },
+        "phoneNumber": { "type": "string", "description": "Unique phone number for Momo identification." },
+        "displayName": { "type": "string", "description": "User's full name." },
+        "balance": { "type": "number", "description": "Current wallet balance." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the account was created." }
+      },
+      "required": ["uid", "phoneNumber", "displayName", "balance", "createdAt"]
+    },
+    "transactions": {
+      "title": "Transaction Record",
+      "description": "Stores details of money transfers, deposits, and withdrawals.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique transaction ID." },
+        "senderId": { "type": "string", "description": "UID of the sender (null for deposits)." },
+        "receiverId": { "type": "string", "description": "UID of the receiver (null for withdrawals)." },
+        "amount": { "type": "number", "description": "Amount transferred." },
+        "type": { "type": "string", "enum": ["transfer", "deposit", "withdrawal"], "description": "Type of transaction." },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"], "description": "Current status." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the transaction occurred." },
+        "senderPhone": { "type": "string", "description": "Phone number of the sender." },
+        "receiverPhone": { "type": "string", "description": "Phone number of the receiver." }
+      },
+      "required": ["id", "amount", "type", "status", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "Individual user profile documents."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transactions",
+      "description": "Global transaction history log."
+    }
+  }
+}
