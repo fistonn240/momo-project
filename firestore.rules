@@ -72,7 +72,7 @@ service cloud.firestore {
     }
 
     function isValidTransaction(data) {
-      return hasRequiredFields(['id', 'amount', 'type', 'status', 'timestamp']) &&
+      return hasRequiredFields(['amount', 'type', 'status', 'timestamp']) &&
              data.amount is number && data.amount > 0 &&
              data.type in ['transfer', 'deposit', 'withdrawal'] &&
              data.status in ['pending', 'completed', 'failed'];
@@ -83,16 +83,12 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated(); // Allow searching users by phone number
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isAuthenticated() && (
-        // Owner can update their own profile (except balance directly, though in this simple app we might allow it for simulation)
-        // Actually, for a real app balance should be server-side or via transactions.
-        // But here we'll allow the owner to update if it's a valid user object.
         (isOwner(userId) && isValidUser(request.resource.data)) ||
-        // System/Admin or via transaction logic (simulated here as any authenticated user for the receiver's balance)
-        // In a real app, this would be much stricter.
-        isAuthenticated()
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance']) && 
+         request.resource.data.balance > resource.data.balance)
       );
     }
 
